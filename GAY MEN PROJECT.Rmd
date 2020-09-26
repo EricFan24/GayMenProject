@@ -1,0 +1,517 @@
+---
+title: "GAY MAN PROJECT"
+author: "Eric Fan"
+date: "February 10, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(forcats)
+library(plotly)
+```
+
+```{r}
+STORIES<- STORIES_20200330
+```
+
+# extract nouns & verbs
+```{r}
+AllNouns <- STORIES %>% 
+  filter(postag == "NN" | postag == "NNS" | postag == "NNP" | postag == "NNPS") %>%
+  select(lemma)
+
+AllVerbs <- STORIES %>% 
+  filter(postag == 'VB' |postag == 'VBD' |postag == 'VBG' |postag == 'VBN' |postag == 'VBP' |postag == 'VBZ') %>%
+  select(lemma)
+
+write.csv(AllVerbs,"AllVerbs.csv",row.names = F)
+write.csv(AllNouns,"AllNouns.csv",row.names = F)
+```
+
+
+```{r}
+STORIES %>% 
+  filter(lemma != "." & lemma != "," & lemma != ";"& lemma != "%" & postag != "CC" & postag != "DT" & postag != "IN" & postag != "TO" & postag != "MD" & postag != "PRP" & postag != "PRP$") %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+STORIES %>% 
+  filter(postag == "NN" | postag == "NNS" | postag == "NNP" | postag == "NNPS") %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency)) 
+
+write.csv(STORIES,"STORIES_20200330.csv",row.names = F)
+```
+
+#come-out splitter
+```{r}
+
+STORIES <- STORIES %>%
+  mutate(DocumentID_SentenceID = paste(DocumentID, SentenceID, sep = "_"))
+
+############
+
+
+
+############
+
+come_out_sentence <- character(length = 300)
+k<-1
+for (i in STORIES$RecordID) {
+  if (STORIES[i,]$lemma == 'come'){
+    if (STORIES[i+1,]$lemma == 'out') {
+      come_out_sentence[k] <- as.character(STORIES[i,]$DocumentID_SentenceID)
+      k <- k+1
+    }
+  }
+}
+
+
+STORIES_come_out <- STORIES[STORIES$DocumentID_SentenceID %in% come_out_list, ]
+
+# age coming out?
+STORIES_come_out %>%
+  filter(ner == 'NUMBER' | ner == 'DATE') %>%
+  group_by(lemma) %>%
+  summarise(lemma_count = n()) %>%
+  arrange(desc(lemma_count))
+  
+##################
+STORIES$before_come_out <- NA
+
+before <- TRUE
+
+document_id <- 1
+
+for (i in STORIES$RecordID) {
+  if (STORIES[i,]$DocumentID != document_id) {
+    before <- TRUE
+    document_id <- STORIES[i,]$DocumentID
+  }
+  
+  if (before == TRUE) {
+    STORIES[i,]$before_come_out <- TRUE
+  } else {
+    STORIES[i,]$before_come_out <- FALSE
+  }
+  
+  if (STORIES[i,]$lemma == 'come'){
+    if (STORIES[i+1,]$lemma == 'out') {
+      before <- FALSE
+    }
+  }
+}
+
+write.csv(STORIES,"STORIES_20200330.csv",row.names = F)
+
+##################
+come_list <- STORIES %>%
+  filter(lemma == "come") %>%
+  select(DocumentID_SentenceID) %>%
+  unique()
+
+out_list <- STORIES %>%
+  filter(lemma == "out") %>%
+  select(DocumentID_SentenceID) %>%
+  unique()
+
+come_out_list_old <- intersect(come_list$DocumentID_SentenceID,out_list$DocumentID_SentenceID)
+
+STORIES_come_out_old <- STORIES[STORIES$DocumentID_SentenceID %in% come_out_list, ]
+
+############################
+
+STORIES_CAME_OUT_LIST <- STORIES %>%
+  filter(before_come_out == FALSE) %>%
+  select(DocumentID) %>%
+  unique() 
+
+
+STORIES_CAME_OUT <- STORIES[STORIES$DocumentID %in% STORIES_CAME_OUT_LIST$DocumentID,]
+
+
+```
+
+#overview
+```{r}
+STORIES %>% 
+  filter(lemma != "." & lemma != "," & lemma != ";"& lemma != "%" & postag != "CC" & postag != "DT" & postag != "IN" & postag != "TO" & postag != "MD" & postag != "PRP" & postag != "PRP$") %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+STORIES %>% 
+  filter(postag == "NN" | postag == "NNS" | postag == "NNP" | postag == "NNPS") %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency)) 
+
+#######################################################################################
+
+# NOUNS
+STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  filter(postag == "NN" | postag == "NNS" | postag == "NNP" | postag == "NNPS") %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency)) 
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  filter(postag == "NN" | postag == "NNS" | postag == "NNP" | postag == "NNPS") %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency)) 
+
+# ADJ
+ADJ_before <- STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  filter(postag == "JJ" | postag == "JJR" | postag == "JJS" ) %>%
+  group_by(lemma) %>%
+  summarise(lemma_count_before = n()) %>%
+  mutate(lemma_frequency_before = lemma_count_before / sum(lemma_count_before)) %>%
+  arrange(desc(lemma_frequency_before)) 
+
+ADJ_after <- STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  filter(postag == "JJ" | postag == "JJR" | postag == "JJS" ) %>%
+  group_by(lemma) %>%
+  summarise(lemma_count_after = n()) %>%
+  mutate(lemma_frequency_after = lemma_count_after / sum(lemma_count_after)) %>%
+  arrange(desc(lemma_frequency_after)) 
+
+
+
+ADJ <- full_join(ADJ_before,ADJ_after)
+ADJ$lemma <- as.character(ADJ$lemma)
+ADJ %>%
+  filter(lemma == 'happy' | lemma == 'good' |lemma == 'better' |lemma == 'best' |lemma == 'sad') %>%
+  plot_ly(x = ~lemma,  y = ~lemma_frequency_before, type = 'bar',name = 'before') %>%
+  add_trace(y = ~lemma_frequency_after, name = 'after') %>%
+  layout(yaxis = list(title = 'frequency'), barmode = 'group', title = 'Before/After Comparison')
+
+ADJ %>%
+  filter(lemma == 'awesome' |lemma == 'comfortable' |lemma == 'wonderful' |lemma == 'beautiful') %>%
+  plot_ly(x = ~lemma,  y = ~lemma_frequency_before, type = 'bar',name = 'before') %>%
+  add_trace(y = ~lemma_frequency_after, name = 'after') %>%
+  layout(yaxis = list(title = 'frequency'), barmode = 'group', title = 'Before/After Comparison')
+
+ADJ %>%
+  filter(lemma == 'easy' |lemma == 'difficult'|lemma == 'hard') %>%
+  plot_ly(x = ~lemma,  y = ~lemma_frequency_before, type = 'bar',name = 'before') %>%
+  add_trace(y = ~lemma_frequency_after, name = 'after') %>%
+  layout(yaxis = list(title = 'frequency'), barmode = 'group', title = 'Before/After Comparison')
+
+# FAMILY
+STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  filter(lemma == "mom" | lemma == "dad" |lemma == "mother" | lemma == "father"| lemma == "family" | lemma == "friend") %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  filter(lemma == "mom" | lemma == "dad" |lemma == "mother" | lemma == "father"| lemma == "family" | lemma == "friend") %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+
+```
+# word count before / after
+```{r}
+STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  count()
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  count()
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  filter(postag != ',' & postag != '.') %>%
+  group_by(postag) %>%
+  summarise(postag_freq = n() / 85602) %>%
+  arrange(desc(postag_freq))
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  filter(postag != ',' & postag != '.') %>%
+  group_by(postag) %>%
+  summarise(postag_freq = n() / 129115) %>%
+  arrange(desc(postag_freq))
+```
+
+
+# ideology 
+```{r}
+STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  filter(ner == 'IDEOLOGY'|lemma == 'political'|lemma == 'ideology')%>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  filter(ner == 'IDEOLOGY'|lemma == 'political'|lemma == 'ideology')%>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+------------------------
+  
+Ideology_Before <- STORIES_CAME_OUT %>%
+  filter(ner == 'IDEOLOGY'|lemma == 'political' )%>%
+  filter(before_come_out == TRUE) %>%
+  group_by(lemma) %>%
+  summarise(lemma_count_before = n()) %>%
+  mutate(lemma_frequency_before = lemma_count_before / 85602) %>%
+  arrange(desc(lemma_frequency_before)) 
+
+Ideology_After <- STORIES_CAME_OUT %>%
+  filter(ner == 'IDEOLOGY'|lemma == 'political' )%>%
+  filter(before_come_out == FALSE) %>%
+  group_by(lemma) %>%
+  summarise(lemma_count_after = n()) %>%
+  mutate(lemma_frequency_after = lemma_count_after / 129115) %>%
+  arrange(desc(lemma_frequency_after))  
+
+Ideology <- full_join(Ideology_Before,Ideology_After)
+
+Ideology %>%
+  filter(lemma == 'conservative' |lemma == 'conservatism' |lemma == 'progressive' |lemma == 'liberal' |lemma == 'political') %>%
+  plot_ly(x = c('political','conservative',  'conservatism', 'progressive','liberal'),  
+          y = ~lemma_frequency_before, 
+          type = 'bar',
+          name = 'before') %>%
+  add_trace(y = ~lemma_frequency_after, name = 'after') %>%
+  layout(yaxis = list(title = 'frequency'), 
+         barmode = 'group', 
+         title = 'Ideology: Before/After Comparison',
+         xaxis = list(type = 'category'))
+
+
+```
+
+#religion
+```{r}
+STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  filter(ner == 'RELIGION' | lemma == 'god'| lemma == 'God' | lemma == 'pray' | lemma == 'faith'| lemma == 'church' | lemma == 'minister'|lemma == 'religion'|lemma == 'religious'|lemma == 'worship'|lemma == 'mosque'|lemma == 'temple')%>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  filter(ner == 'RELIGION' | lemma == 'god'| lemma == 'God' | lemma == 'pray' | lemma == 'faith'| lemma == 'church' | lemma == 'minister'|lemma == 'religion'|lemma == 'religious'|lemma == 'worship'|lemma == 'mosque'|lemma == 'temple')%>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+--------------------------------------------------------------------------
+Religion_Before <- STORIES_CAME_OUT %>%
+  filter(ner == 'RELIGION' | lemma == 'god'| lemma == 'God' | lemma == 'pray' | lemma == 'faith'| lemma == 'church' | lemma == 'religion'|lemma == 'religious')%>%
+  filter(before_come_out == TRUE) %>%
+  group_by(lemma) %>%
+  summarise(lemma_count_before = n()) %>%
+  mutate(lemma_frequency_before = lemma_count_before / 85602) %>%
+  arrange(desc(lemma_frequency_before)) 
+
+Religion_After <- STORIES_CAME_OUT %>%
+  filter(ner == 'RELIGION' | lemma == 'god'| lemma == 'God' | lemma == 'pray' | lemma == 'faith'| lemma == 'church' | lemma == 'religion'|lemma == 'religious')%>%
+  filter(before_come_out == FALSE) %>%
+  group_by(lemma) %>%
+  summarise(lemma_count_after = n()) %>%
+  mutate(lemma_frequency_after = lemma_count_after / 129115) %>%
+  arrange(desc(lemma_frequency_after))  
+
+Religion <- full_join(Religion_Before,Religion_After)
+
+Religion %>%
+  filter(lemma == 'church' |lemma == 'God' |lemma == 'religious' |lemma == 'religion' |lemma == 'faith' |lemma == 'pray'|lemma == 'christian'|lemma == 'atheist' ) %>%
+  plot_ly(x = c('church','God','religious','religion', 'faith', 'pray', 'christian', 'atheist' ),
+          y = ~lemma_frequency_before, 
+          type = 'bar',
+          name = 'before') %>%
+  add_trace(y = ~lemma_frequency_after, name = 'after') %>%
+  layout(yaxis = list(title = 'frequency'), 
+         barmode = 'group', 
+         title = 'Religion: Before/After Comparison',
+         xaxis = list(type = 'category'))
+
+
+  
+
+```
+
+
+
+
+# verbs: reject/accept? 
+```{r}
+STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  filter(lemma == 'reject' | lemma == 'accept') %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency)) 
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  filter(lemma == 'reject' | lemma == 'accept') %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency))
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE) %>%
+  filter(lemma == 'difficult' | lemma == 'challenge'| lemma == 'hard'| lemma == 'difficulty'| lemma == 'easy') %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency)) 
+
+STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE) %>%
+  filter(lemma == 'difficult' | lemma == 'challenge'| lemma == 'hard'| lemma == 'difficulty'| lemma == 'easy') %>%
+  group_by(lemma) %>%
+  summarise(lemma_frequency = n()) %>%
+  arrange(desc(lemma_frequency)) 
+
+```
+
+# overall: porportion talking about religion? ideology? violence? sex? disease?
+```{r}
+STORIES %>%
+  filter(ner == 'IDEOLOGY') %>%
+  select(DocumentID) %>%
+  unique() %>%
+  count()# 68 / 376
+
+STORIES %>%
+  filter(ner == 'RELIGION') %>%
+  filter(lemma != 'independent' & lemma != 'yoga') %>%
+  select(DocumentID) %>%
+  unique() %>%
+  count() # 45 / 376
+
+# church? god?
+
+STORIES %>%
+  filter(lemma == 'family' | lemma == 'mother'| lemma == 'father'| lemma == 'mom'| lemma == 'dad'| lemma == 'parent'| lemma == 'brother'| lemma == 'sister')  %>%
+  select(DocumentID) %>%
+  unique()%>%
+  count() # 318 / 376
+
+STORIES %>%
+  filter(lemma == 'HIV' | lemma == 'AIDS'| lemma == 'disease' | lemma == 'AID'| lemma == 'cancer'| lemma == 'Alzheimer'| lemma == 'surgery'| lemma == 'illness'| lemma == 'Plague'| lemma == 'plague'| lemma == 'depression'| lemma == 'suicide'| lemma == 'suicidal'| lemma == 'dementia') %>%
+  select(DocumentID) %>%
+  unique()%>%
+  count() # 48 / 376
+
+STORIES %>%
+  filter(lemma == 'overdose' | lemma == 'alcoholism'| lemma == 'smoking' | lemma == 'drug'| lemma == 'alcoholic'| lemma == 'drink'| lemma == 'drinking'| lemma == 'substance'| lemma == 'alcohol'| lemma == 'druggie') %>%
+  select(DocumentID) %>%
+  unique()%>%
+  count() # 37 / 376
+ 
+STORIES %>%
+  filter(lemma == 'violence' | lemma == 'violent'| lemma == 'murder' | lemma == 'rape'| lemma == 'terrorism'| lemma == 'hate'| lemma == 'crime'| lemma == 'intimidation'| lemma == 'bully'| lemma == 'jail') %>%
+  select(DocumentID) %>%
+  unique()%>%
+  count() # 86 / 376
+
+STORIES %>%
+  filter(lemma == 'sex' | lemma == 'sexual'| lemma == 'sexually'| lemma == 'sexuality')  %>%
+  select(DocumentID) %>%
+  unique()%>%
+  count() # 230 / 376
+
+STORIES %>%
+  filter(lemma == 'sex'| lemma == 'sexual'| lemma == 'sexually')  %>%
+  select(DocumentID) %>%
+  unique()%>%
+  count() #179 / 376
+
+STORIES %>%
+  filter(lemma == 'sex')  %>%
+  select(DocumentID) %>%
+  unique()%>%
+  count() #99 / 376
+
+
+
+```
+
+# model verbs?
+```{r}
+Model_Before <- STORIES_CAME_OUT %>%
+  filter(postag == "MD") %>%
+  filter(before_come_out == TRUE) %>%
+  group_by(lemma) %>%
+  summarise(lemma_count_before = n()) %>%
+  mutate(lemma_frequency_before = lemma_count_before / sum(lemma_count_before)) %>%
+  arrange(desc(lemma_frequency_before)) 
+
+Model_After <- STORIES_CAME_OUT %>%
+  filter(postag == "MD") %>%
+  filter(before_come_out == FALSE) %>%
+  group_by(lemma) %>%
+  summarise(lemma_count_after = n()) %>%
+  mutate(lemma_frequency_after = lemma_count_after / sum(lemma_count_after)) %>%
+  arrange(desc(lemma_frequency_after))  
+
+Model <- full_join(Model_Before,Model_After)
+# Model$lemma <- as.character(Model$lemma)
+Model %>%
+  filter(lemma == 'would' |lemma == 'can' |lemma == 'will' |lemma == 'could' |lemma == 'should' |lemma == 'must' ) %>%
+  plot_ly(x = c('would', 'can', 'will', 'could', 'should', 'must'),  
+          y = ~lemma_frequency_before, 
+          type = 'bar',
+          name = 'before') %>%
+  add_trace(y = ~lemma_frequency_after, name = 'after') %>%
+  layout(yaxis = list(title = 'frequency'), 
+         barmode = 'group', 
+         title = 'Model Verbs: Before/After Comparison',
+         xaxis = list(type = 'category'))
+
+
+
+
+```
+# Verb Voice
+```{r}
+conll_before <- STORIES_CAME_OUT %>%
+  filter(before_come_out == TRUE)
+
+conll_after <- STORIES_CAME_OUT %>%
+  filter(before_come_out == FALSE)
+
+write.csv(conll_before,"conll_before.csv",row.names = F)
+write.csv(conll_after,"conll_after.csv",row.names = F)
+
+STORIES_CAME_OUT %>% 
+  filter(postag == 'VB' |postag == 'VBD' |postag == 'VBG' |postag == 'VBN' |postag == 'VBP' |postag == 'VBZ') %>%
+  mutate(verbVoice = ifelse(deprel == "auxpass" | postag == "VBN", "Passive", "Active" )) %>%
+  group_by(before_come_out,verbVoice ) %>%
+  summarise(verbVoice_frequency = n()) %>%
+mutate(verbVoice_proportion = verbVoice_frequency / sum(verbVoice_frequency))
+
+STORIES_CAME_OUT %>% 
+  mutate(verbVoice = ifelse(deprel == "auxpass" | postag == "VBN", "Passive", "Active" )) %>%
+  group_by(before_come_out,verbVoice ) %>%
+  summarise(verbVoice_frequency = n()) %>%
+mutate(verbVoice_proportion = verbVoice_frequency / sum(verbVoice_frequency))
+```
+

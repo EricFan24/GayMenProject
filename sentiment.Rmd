@@ -1,0 +1,55 @@
+---
+title: "sentiment"
+author: "Eric Fan"
+date: "April 11, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+sentiment <- NLP_SC_new.corpus_Sentiment.CoreNLP
+```
+
+```{r}
+sentiment_CAME_OUT <- sentiment[sentiment$Document.ID %in% STORIES_CAME_OUT_LIST$DocumentID,]
+
+sentiment_CAME_OUT <- sentiment_CAME_OUT %>%
+  mutate(DocumentID_SentenceID = paste(Document.ID, Sentence.ID, sep = "_"))
+
+sentiment_CAME_OUT <- sentiment_CAME_OUT[sentiment_CAME_OUT$DocumentID_SentenceID %in% come_out_sentence,]
+```
+
+```{r}
+sentence_count <- sentiment %>%
+  group_by(Document.ID) %>%
+  count()
+
+sentiment$sentence_percent <- NA
+  
+for (i in 1:12099) {
+  sentiment[i,]$sentence_percent <- (sentiment[i,]$Sentence.ID / sentence_count[sentence_count$Document.ID == sentiment[i,]$Document.ID,]$n * 100)
+  
+}
+
+
+
+sentiment %>%
+  ggplot(aes(x = sentence_percent, y = Sentiment.number)) +
+  geom_point() +
+  geom_smooth()
+
+sentiment_CAME_OUT %>%
+  ggplot(aes(x = sentence_percent, y = Sentiment.number)) +
+  geom_point() +
+  geom_smooth()
+```
+
+# try other indexes?
+# other coming out expressions?
